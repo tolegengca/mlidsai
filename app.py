@@ -10,6 +10,11 @@ from typing import Dict, Tuple, Any, List, Optional
 import random
 import argparse
 from collections import defaultdict
+import logging
+
+# Configure logging
+logger = logging.getLogger('mlidsai')
+logger.setLevel(logging.INFO)
 
 class AnomalyDetector(ABC):
     @abstractmethod
@@ -76,6 +81,7 @@ class StaticAnomalyDetector(AnomalyDetector):
                 self.packet_counts["syn"][current_time] += 1
                 syn_count = sum(self.packet_counts["syn"].values())
                 if syn_count > self.thresholds["syn_flood"]:
+                    logger.debug(f"Detected SYN flood: {syn_count} packets in window")
                     return True, "syn_flood"
 
             # Check for UDP flood
@@ -83,6 +89,7 @@ class StaticAnomalyDetector(AnomalyDetector):
                 self.packet_counts["udp"][current_time] += 1
                 udp_count = sum(self.packet_counts["udp"].values())
                 if udp_count > self.thresholds["udp_flood"]:
+                    logger.debug(f"Detected UDP flood: {udp_count} packets in window")
                     return True, "udp_flood"
 
             # Check for ICMP flood
@@ -90,6 +97,7 @@ class StaticAnomalyDetector(AnomalyDetector):
                 self.packet_counts["icmp"][current_time] += 1
                 icmp_count = sum(self.packet_counts["icmp"].values())
                 if icmp_count > self.thresholds["icmp_flood"]:
+                    logger.debug(f"Detected ICMP flood: {icmp_count} packets in window")
                     return True, "icmp_flood"
 
         return False, None
@@ -104,7 +112,9 @@ class RandomAnomalyDetector(AnomalyDetector):
     def detect_anomaly(self, packet: Ether, session_info: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         # Randomly decide if packet is anomalous (20% chance)
         if random.random() < 0.2:
-            return True, random.choice(self.anomaly_types)
+            anomaly_type = random.choice(self.anomaly_types)
+            logger.debug(f"Random anomaly detected: {anomaly_type}")
+            return True, anomaly_type
         return False, None
 
     def get_supported_anomaly_types(self) -> List[str]:
@@ -158,6 +168,7 @@ class SessionTable:
                         "total_bytes": 0,
                         "total_packets": 0
                     }
+                    logger.debug(f"New session created: {session_key}")
                 self.sessions[session_key][key] = value
                 self.sessions[session_key]["last_seen"] = time.time()
 
@@ -170,6 +181,7 @@ class SessionTable:
                     if current_time - session["last_seen"] > self.ttl_seconds
                 ]
                 for key in expired_keys:
+                    logger.debug(f"Session expired: {key}")
                     del self.sessions[key]
             time.sleep(1)
 
@@ -208,10 +220,13 @@ class TrafficMonitor:
         packet_size = len(packet)
         session_key = self.session_table.get_session_key(packet)
         
+        logger.debug(f"Processing packet: {packet.summary()}")
+        
         # Update session information
         if session_key:
             if session_key not in self.session_table.sessions:
                 self.total_sessions.inc()
+                logger.debug(f"New session detected: {session_key}")
             
             current_bytes = self.session_table.get(packet, "total_bytes", 0)
             current_packets = self.session_table.get(packet, "total_packets", 0)
@@ -233,15 +248,19 @@ class TrafficMonitor:
             if anomaly_type:
                 self.anomaly_type_bytes.labels(type=anomaly_type).inc(packet_size)
                 self.anomaly_type_packets.labels(type=anomaly_type).inc()
+                logger.debug(f"Anomaly detected: {anomaly_type}")
         else:
             self.normal_bytes.inc(packet_size)
             self.normal_packets.inc()
+            logger.debug("Normal packet")
 
     def start(self):
         # Start Prometheus metrics server
         start_http_server(8000)
+        logger.info(f"Started Prometheus metrics server on port 8000")
         
         # Start packet capture
+        logger.info(f"Starting packet capture on interface {self.interface}")
         sniff(iface=self.interface, prn=self.process_packet, store=1)
 
 def parse_args():
@@ -250,10 +269,22 @@ def parse_args():
                       help='Network interface to capture packets from')
     parser.add_argument('-p', '--prometheus-port', type=int, default=8000,
                       help='Port for Prometheus metrics server (default: 8000)')
+    parser.add_argument('-d', '--debug', action='store_true',
+                      help='Enable debug logging')
     return parser.parse_args()
 
 def main():
     args = parse_args()
+    
+    # Configure logging
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Debug logging enabled")
     
     # Create and start the traffic monitor with StaticAnomalyDetector
     detector = StaticAnomalyDetector()
