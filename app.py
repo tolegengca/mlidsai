@@ -2,12 +2,11 @@ from scapy.all import sniff, IP, TCP, UDP, Ether
 from scapy.layers.inet import IP
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import TCP, UDP
-from prometheus_client import start_http_server, Counter, Gauge
+from prometheus_client import start_http_server, Counter
 import threading
 import time
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple, Any, List, Optional
-from collections import defaultdict
 import random
 import argparse
 
@@ -45,7 +44,8 @@ class SessionTable:
         self.lock = threading.Lock()
         self._start_cleanup_thread()
 
-    def _get_session_key(self, packet: Ether) -> str:
+    @staticmethod
+    def get_session_key(packet: Ether) -> str | None:
         if IP in packet:
             src_ip = packet[IP].src
             dst_ip = packet[IP].dst
@@ -59,23 +59,23 @@ class SessionTable:
                 proto = "UDP"
             else:
                 return None
-            
+
             # Sort IPs and ports to ensure same session key for both directions
             if src_ip > dst_ip or (src_ip == dst_ip and src_port > dst_port):
                 src_ip, dst_ip = dst_ip, src_ip
                 src_port, dst_port = dst_port, src_port
-            
+
             return f"{src_ip}:{src_port}-{dst_ip}:{dst_port}-{proto}"
         return None
 
     def get(self, packet: Ether, key: str, default: Any = None) -> Any:
-        session_key = self._get_session_key(packet)
+        session_key = self.get_session_key(packet)
         if session_key and session_key in self.sessions:
             return self.sessions[session_key].get(key, default)
         return default
 
     def set(self, packet: Ether, key: str, value: Any) -> None:
-        session_key = self._get_session_key(packet)
+        session_key = self.get_session_key(packet)
         if session_key:
             with self.lock:
                 if session_key not in self.sessions:
@@ -128,7 +128,7 @@ class TrafficMonitor:
             return
 
         packet_size = len(packet)
-        session_key = self.session_table._get_session_key(packet)
+        session_key = self.session_table.get_session_key(packet)
         
         # Update session information
         if session_key:
