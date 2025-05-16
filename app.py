@@ -1,4 +1,4 @@
-from scapy.all import sniff, IP, TCP, UDP, Ether
+from scapy.all import sniff, IP, TCP, UDP, Ether, ICMP
 from scapy.layers.inet import IP
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import TCP, UDP
@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Tuple, Any, List, Optional
 import random
 import argparse
+from collections import defaultdict
 
 class AnomalyDetector(ABC):
     @abstractmethod
@@ -23,6 +24,78 @@ class AnomalyDetector(ABC):
     def get_supported_anomaly_types(self) -> List[str]:
         """Return list of supported anomaly types"""
         pass
+
+class StaticAnomalyDetector(AnomalyDetector):
+    def __init__(self):
+        self.anomaly_types = ["syn_flood", "udp_flood", "icmp_flood"]
+        
+        # Time window for rate calculation (in seconds)
+        self.time_window = 5
+        
+        # Thresholds for different types of attacks
+        self.thresholds = {
+            "syn_flood": 50,  # packets per time window
+            "udp_flood": 30,  # packets per time window
+            "icmp_flood": 20  # packets per time window
+        }
+        
+        # Store packet counts in time windows
+        self.packet_counts = {
+            "syn": defaultdict(int),
+            "udp": defaultdict(int),
+            "icmp": defaultdict(int)
+        }
+        self.last_cleanup = int(time.time())
+        
+        # Lock for thread safety
+        self.lock = threading.Lock()
+
+    def _cleanup_old_windows(self):
+        current_time = int(time.time())
+        if current_time - self.last_cleanup >= 1:  # Cleanup every second
+            with self.lock:
+                cutoff_time = current_time - self.time_window
+                for proto in self.packet_counts:
+                    # Remove old entries
+                    self.packet_counts[proto] = defaultdict(int, {
+                        k: v for k, v in self.packet_counts[proto].items()
+                        if k > cutoff_time
+                    })
+                self.last_cleanup = current_time
+
+    def detect_anomaly(self, packet: Ether, session_info: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+        if IP not in packet:
+            return False, None
+
+        current_time = int(time.time())
+        self._cleanup_old_windows()
+
+        with self.lock:
+            # Check for SYN flood
+            if TCP in packet and packet[TCP].flags == 0x02:  # SYN flag
+                self.packet_counts["syn"][current_time] += 1
+                syn_count = sum(self.packet_counts["syn"].values())
+                if syn_count > self.thresholds["syn_flood"]:
+                    return True, "syn_flood"
+
+            # Check for UDP flood
+            if UDP in packet:
+                self.packet_counts["udp"][current_time] += 1
+                udp_count = sum(self.packet_counts["udp"].values())
+                if udp_count > self.thresholds["udp_flood"]:
+                    return True, "udp_flood"
+
+            # Check for ICMP flood
+            if ICMP in packet:
+                self.packet_counts["icmp"][current_time] += 1
+                icmp_count = sum(self.packet_counts["icmp"].values())
+                if icmp_count > self.thresholds["icmp_flood"]:
+                    return True, "icmp_flood"
+
+        return False, None
+
+    def get_supported_anomaly_types(self) -> List[str]:
+        return self.anomaly_types
 
 class RandomAnomalyDetector(AnomalyDetector):
     def __init__(self):
@@ -59,12 +132,12 @@ class SessionTable:
                 proto = "UDP"
             else:
                 return None
-
+            
             # Sort IPs and ports to ensure same session key for both directions
             if src_ip > dst_ip or (src_ip == dst_ip and src_port > dst_port):
                 src_ip, dst_ip = dst_ip, src_ip
                 src_port, dst_port = dst_port, src_port
-
+            
             return f"{src_ip}:{src_port}-{dst_ip}:{dst_port}-{proto}"
         return None
 
@@ -123,6 +196,11 @@ class TrafficMonitor:
         self.anomaly_type_bytes = Counter('mlidsai_anomaly_type_bytes', 'Bytes per anomaly type', ['type'])
         self.anomaly_type_packets = Counter('mlidsai_anomaly_type_packets', 'Packets per anomaly type', ['type'])
 
+        # Initialize all anomaly type counters to 0
+        for anomaly_type in self.anomaly_detector.get_supported_anomaly_types():
+            self.anomaly_type_bytes.labels(type=anomaly_type)
+            self.anomaly_type_packets.labels(type=anomaly_type)
+
     def process_packet(self, packet: Ether):
         if IP not in packet:
             return
@@ -164,7 +242,7 @@ class TrafficMonitor:
         start_http_server(8000)
         
         # Start packet capture
-        sniff(iface=self.interface, prn=self.process_packet, store=0)
+        sniff(iface=self.interface, prn=self.process_packet, store=1)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Network Traffic Monitor with Anomaly Detection')
@@ -177,8 +255,8 @@ def parse_args():
 def main():
     args = parse_args()
     
-    # Create and start the traffic monitor
-    detector = RandomAnomalyDetector()
+    # Create and start the traffic monitor with StaticAnomalyDetector
+    detector = StaticAnomalyDetector()
     monitor = TrafficMonitor(args.interface, detector)
     monitor.start()
 
