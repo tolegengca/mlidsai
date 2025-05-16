@@ -158,6 +158,11 @@ class SessionTable:
                 src_port = packet[UDP].sport
                 dst_port = packet[UDP].dport
                 proto = "UDP"
+            elif ICMP in packet:
+                # For ICMP, we use type and code as ports
+                src_port = packet[ICMP].type
+                dst_port = packet[ICMP].code
+                proto = "ICMP"
             else:
                 return None
 
