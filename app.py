@@ -13,12 +13,15 @@ from collections import defaultdict
 import logging
 
 # Configure logging
-logger = logging.getLogger('mlidsai')
+logger = logging.getLogger("mlidsai")
 logger.setLevel(logging.INFO)
+
 
 class AnomalyDetector(ABC):
     @abstractmethod
-    def detect_anomaly(self, packet: Ether, session_info: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def detect_anomaly(
+        self, packet: Ether, session_info: Dict[str, Any]
+    ) -> Tuple[bool, Optional[str]]:
         """
         Detect if the packet is anomalous
         Returns: (is_anomaly: bool, anomaly_type: Optional[str])
@@ -30,28 +33,29 @@ class AnomalyDetector(ABC):
         """Return list of supported anomaly types"""
         pass
 
+
 class StaticAnomalyDetector(AnomalyDetector):
     def __init__(self):
         self.anomaly_types = ["syn_flood", "udp_flood", "icmp_flood"]
-        
+
         # Time window for rate calculation (in seconds)
         self.time_window = 5
-        
+
         # Thresholds for different types of attacks
         self.thresholds = {
             "syn_flood": 50,  # packets per time window
             "udp_flood": 30,  # packets per time window
-            "icmp_flood": 20  # packets per time window
+            "icmp_flood": 20,  # packets per time window
         }
-        
+
         # Store packet counts in time windows
         self.packet_counts = {
             "syn": defaultdict(int),
             "udp": defaultdict(int),
-            "icmp": defaultdict(int)
+            "icmp": defaultdict(int),
         }
         self.last_cleanup = int(time.time())
-        
+
         # Lock for thread safety
         self.lock = threading.Lock()
 
@@ -62,13 +66,19 @@ class StaticAnomalyDetector(AnomalyDetector):
                 cutoff_time = current_time - self.time_window
                 for proto in self.packet_counts:
                     # Remove old entries
-                    self.packet_counts[proto] = defaultdict(int, {
-                        k: v for k, v in self.packet_counts[proto].items()
-                        if k > cutoff_time
-                    })
+                    self.packet_counts[proto] = defaultdict(
+                        int,
+                        {
+                            k: v
+                            for k, v in self.packet_counts[proto].items()
+                            if k > cutoff_time
+                        },
+                    )
                 self.last_cleanup = current_time
 
-    def detect_anomaly(self, packet: Ether, session_info: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def detect_anomaly(
+        self, packet: Ether, session_info: Dict[str, Any]
+    ) -> Tuple[bool, Optional[str]]:
         if IP not in packet:
             return False, None
 
@@ -105,11 +115,18 @@ class StaticAnomalyDetector(AnomalyDetector):
     def get_supported_anomaly_types(self) -> List[str]:
         return self.anomaly_types
 
+
 class RandomAnomalyDetector(AnomalyDetector):
     def __init__(self):
-        self.anomaly_types = ["suspicious_payload", "unusual_protocol", "high_frequency"]
+        self.anomaly_types = [
+            "suspicious_payload",
+            "unusual_protocol",
+            "high_frequency",
+        ]
 
-    def detect_anomaly(self, packet: Ether, session_info: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def detect_anomaly(
+        self, packet: Ether, session_info: Dict[str, Any]
+    ) -> Tuple[bool, Optional[str]]:
         # Randomly decide if packet is anomalous (20% chance)
         if random.random() < 0.2:
             anomaly_type = random.choice(self.anomaly_types)
@@ -119,6 +136,7 @@ class RandomAnomalyDetector(AnomalyDetector):
 
     def get_supported_anomaly_types(self) -> List[str]:
         return self.anomaly_types
+
 
 class SessionTable:
     def __init__(self, ttl_seconds: int = 60):
@@ -142,12 +160,12 @@ class SessionTable:
                 proto = "UDP"
             else:
                 return None
-            
+
             # Sort IPs and ports to ensure same session key for both directions
             if src_ip > dst_ip or (src_ip == dst_ip and src_port > dst_port):
                 src_ip, dst_ip = dst_ip, src_ip
                 src_port, dst_port = dst_port, src_port
-            
+
             return f"{src_ip}:{src_port}-{dst_ip}:{dst_port}-{proto}"
         return None
 
@@ -166,7 +184,8 @@ class SessionTable:
                         "first_seen": time.time(),
                         "last_seen": time.time(),
                         "total_bytes": 0,
-                        "total_packets": 0
+                        "total_packets": 0,
+                        "is_anomaly": False,
                     }
                     logger.debug(f"New session created: {session_key}")
                 self.sessions[session_key][key] = value
@@ -177,7 +196,8 @@ class SessionTable:
             current_time = time.time()
             with self.lock:
                 expired_keys = [
-                    key for key, session in self.sessions.items()
+                    key
+                    for key, session in self.sessions.items()
                     if current_time - session["last_seen"] > self.ttl_seconds
                 ]
                 for key in expired_keys:
@@ -186,32 +206,49 @@ class SessionTable:
             time.sleep(1)
 
     def _start_cleanup_thread(self):
-        cleanup_thread = threading.Thread(target=self._cleanup_expired_sessions, daemon=True)
+        cleanup_thread = threading.Thread(
+            target=self._cleanup_expired_sessions, daemon=True
+        )
         cleanup_thread.start()
+
 
 class TrafficMonitor:
     def __init__(self, interface: str, anomaly_detector: AnomalyDetector):
         self.interface = interface
         self.anomaly_detector = anomaly_detector
         self.session_table = SessionTable()
-        
+
         # Initialize Prometheus metrics
-        self.total_bytes = Counter('mlidsai_total_bytes', 'Total bytes processed')
-        self.total_packets = Counter('mlidsai_total_packets', 'Total packets processed')
-        self.total_sessions = Counter('mlidsai_total_sessions', 'Total new sessions detected')
-        self.normal_bytes = Counter('mlidsai_normal_bytes', 'Total normal bytes')
-        self.normal_packets = Counter('mlidsai_normal_packets', 'Total normal packets')
-        self.anomaly_bytes = Counter('mlidsai_anomaly_bytes', 'Total anomaly bytes')
-        self.anomaly_packets = Counter('mlidsai_anomaly_packets', 'Total anomaly packets')
-        
+        self.total_bytes = Counter("mlidsai_total_bytes", "Total bytes processed")
+        self.total_packets = Counter("mlidsai_total_packets", "Total packets processed")
+        self.total_sessions = Counter(
+            "mlidsai_total_sessions", "Total new sessions detected"
+        )
+        self.normal_bytes = Counter("mlidsai_normal_bytes", "Total normal bytes")
+        self.normal_packets = Counter("mlidsai_normal_packets", "Total normal packets")
+        self.anomaly_bytes = Counter("mlidsai_anomaly_bytes", "Total anomaly bytes")
+        self.anomaly_packets = Counter(
+            "mlidsai_anomaly_packets", "Total anomaly packets"
+        )
+
         # Initialize anomaly metrics with type label
-        self.anomaly_type_bytes = Counter('mlidsai_anomaly_type_bytes', 'Bytes per anomaly type', ['type'])
-        self.anomaly_type_packets = Counter('mlidsai_anomaly_type_packets', 'Packets per anomaly type', ['type'])
+        self.anomaly_type_bytes = Counter(
+            "mlidsai_anomaly_type_bytes", "Bytes per anomaly type", ["type"]
+        )
+        self.anomaly_type_packets = Counter(
+            "mlidsai_anomaly_type_packets", "Packets per anomaly type", ["type"]
+        )
+
+        # Initialize anomaly session counter
+        self.anomaly_sessions = Counter(
+            "mlidsai_anomaly_sessions", "Number of anomaly sessions detected", ["type"]
+        )
 
         # Initialize all anomaly type counters to 0
         for anomaly_type in self.anomaly_detector.get_supported_anomaly_types():
             self.anomaly_type_bytes.labels(type=anomaly_type)
             self.anomaly_type_packets.labels(type=anomaly_type)
+            self.anomaly_sessions.labels(type=anomaly_type)
 
     def process_packet(self, packet: Ether):
         if IP not in packet:
@@ -219,18 +256,18 @@ class TrafficMonitor:
 
         packet_size = len(packet)
         session_key = self.session_table.get_session_key(packet)
-        
+
         logger.debug(f"Processing packet: {packet.summary()}")
-        
+
         # Update session information
         if session_key:
             if session_key not in self.session_table.sessions:
                 self.total_sessions.inc()
                 logger.debug(f"New session detected: {session_key}")
-            
+
             current_bytes = self.session_table.get(packet, "total_bytes", 0)
             current_packets = self.session_table.get(packet, "total_packets", 0)
-            
+
             self.session_table.set(packet, "total_bytes", current_bytes + packet_size)
             self.session_table.set(packet, "total_packets", current_packets + 1)
 
@@ -240,7 +277,8 @@ class TrafficMonitor:
 
         # Detect anomaly
         is_anomaly, anomaly_type = self.anomaly_detector.detect_anomaly(
-            packet, self.session_table.sessions.get(session_key, {}))
+            packet, self.session_table.sessions.get(session_key, {})
+        )
 
         if is_anomaly:
             self.anomaly_bytes.inc(packet_size)
@@ -249,6 +287,14 @@ class TrafficMonitor:
                 self.anomaly_type_bytes.labels(type=anomaly_type).inc(packet_size)
                 self.anomaly_type_packets.labels(type=anomaly_type).inc()
                 logger.debug(f"Anomaly detected: {anomaly_type}")
+
+                # Update session anomaly information and increment counter if it's a new anomaly
+                if session_key:
+                    session = self.session_table.sessions[session_key]
+                    if not session.get("is_anomaly"):
+                        session["is_anomaly"] = True
+                        session["anomaly_type"] = anomaly_type
+                        self.anomaly_sessions.labels(type=anomaly_type).inc()
         else:
             self.normal_bytes.inc(packet_size)
             self.normal_packets.inc()
@@ -258,38 +304,55 @@ class TrafficMonitor:
         # Start Prometheus metrics server
         start_http_server(8000)
         logger.info(f"Started Prometheus metrics server on port 8000")
-        
+
         # Start packet capture
         logger.info(f"Starting packet capture on interface {self.interface}")
         sniff(iface=self.interface, prn=self.process_packet, store=1)
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(description='Network Traffic Monitor with Anomaly Detection')
-    parser.add_argument('-i', '--interface', required=True,
-                      help='Network interface to capture packets from')
-    parser.add_argument('-p', '--prometheus-port', type=int, default=8000,
-                      help='Port for Prometheus metrics server (default: 8000)')
-    parser.add_argument('-d', '--debug', action='store_true',
-                      help='Enable debug logging')
+    parser = argparse.ArgumentParser(
+        description="Network Traffic Monitor with Anomaly Detection"
+    )
+    parser.add_argument(
+        "-i",
+        "--interface",
+        required=True,
+        help="Network interface to capture packets from",
+    )
+    parser.add_argument(
+        "-p",
+        "--prometheus-port",
+        type=int,
+        default=8000,
+        help="Port for Prometheus metrics server (default: 8000)",
+    )
+    parser.add_argument(
+        "-d", "--debug", action="store_true", help="Enable debug logging"
+    )
     return parser.parse_args()
+
 
 def main():
     args = parse_args()
-    
+
     # Configure logging
     handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    
+
     if args.debug:
         logger.setLevel(logging.DEBUG)
         logger.debug("Debug logging enabled")
-    
+
     # Create and start the traffic monitor with StaticAnomalyDetector
     detector = StaticAnomalyDetector()
     monitor = TrafficMonitor(args.interface, detector)
     monitor.start()
+
 
 if __name__ == "__main__":
     main()
