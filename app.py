@@ -3,6 +3,8 @@ from scapy.layers.inet import IP
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import TCP, UDP
 from prometheus_client import start_http_server, Counter
+import tensorflow as tf
+import numpy as np
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -34,17 +36,75 @@ class AnomalyDetector(ABC):
         pass
 
 
+class AIAnomalyDetector(AnomalyDetector):
+    def __init__(self, model_path: str = "ai_model.keras"):
+        self.anomaly_types = ["syn_flood", "udp_flood", "icmp_flood"]
+        self.protocols = ["syn", "udp", "icmp"]
+        self.thresholds = {"syn": 20, "udp": 1000, "icmp": 20}
+        self.time_window = 2
+        self.packet_counts = {proto: defaultdict(int) for proto in self.protocols}
+        self.last_cleanup = int(time.time())
+        self.model = tf.keras.models.load_model(model_path)
+
+    def get_supported_anomaly_types(self) -> List[str]:
+        return self.anomaly_types
+
+    def _cleanup_old_windows(self):
+        now = int(time.time())
+        if now - self.last_cleanup >= 1:
+            cutoff = now - self.time_window
+            for proto in self.protocols:
+                self.packet_counts[proto] = defaultdict(
+                    int, {t: c for t, c in self.packet_counts[proto].items() if t > cutoff}
+                )
+            self.last_cleanup = now
+
+    def _extract_feature(self, active_proto: str) -> np.ndarray:
+        val = sum(self.packet_counts[active_proto].values())
+        ratio = min(1.0, val / self.thresholds[active_proto])
+        return np.array([[ratio]], dtype=np.float32)
+
+    def detect_anomaly(
+        self, packet: Ether, session_info: Dict[str, Any]
+    ) -> Tuple[bool, Optional[str]]:
+        if IP not in packet:
+            return False, None
+
+        now = int(time.time())
+        self._cleanup_old_windows()
+
+        proto = None
+        if TCP in packet and packet[TCP].flags == 0x02:
+            proto = "syn"
+            idx = 0
+        elif UDP in packet:
+            proto = "udp"
+            idx = 1
+        elif ICMP in packet:
+            proto = "icmp"
+            idx = 2
+
+        if proto:
+            self.packet_counts[proto][now] += 1
+            feature = self._extract_feature(proto)
+            prediction = self.model.predict(feature, verbose=0)[0][0]
+            if prediction > 0.9:
+                return True, self.anomaly_types[idx]
+
+        return False, None
+
+
 class StaticAnomalyDetector(AnomalyDetector):
     def __init__(self):
         self.anomaly_types = ["syn_flood", "udp_flood", "icmp_flood"]
 
         # Time window for rate calculation (in seconds)
-        self.time_window = 5
+        self.time_window = 2
 
         # Thresholds for different types of attacks
         self.thresholds = {
             "syn_flood": 50,  # packets per time window
-            "udp_flood": 30,  # packets per time window
+            "udp_flood": 100,  # packets per time window
             "icmp_flood": 20,  # packets per time window
         }
 
@@ -354,7 +414,8 @@ def main():
         logger.debug("Debug logging enabled")
 
     # Create and start the traffic monitor with StaticAnomalyDetector
-    detector = StaticAnomalyDetector()
+    # detector = StaticAnomalyDetector()
+    detector = AIAnomalyDetector()
     monitor = TrafficMonitor(args.interface, detector)
     monitor.start()
 
