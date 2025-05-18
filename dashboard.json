@@ -428,32 +428,7 @@
           },
           "unit": "pps"
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "syn_flood"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -710,7 +685,7 @@
           "useBackend": false
         }
       ],
-      "title": "Total new sessions detected",
+      "title": "Total anomaly sessions detected",
       "type": "timeseries"
     }
   ],
@@ -774,6 +749,6 @@
   "timezone": "browser",
   "title": "mlidsai",
   "uid": "da6e8594-5ead-4f1a-998e-93b52eddb40c",
-  "version": 33,
+  "version": 2,
   "weekStart": ""
 }
