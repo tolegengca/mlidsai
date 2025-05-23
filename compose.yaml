@@ -1,4 +1,13 @@
 services:
+  app:
+    build: .
+    network_mode: host
+
+  cicflowmeter:
+    image: ghcr.io/tshelter/cicflowmeter:latest
+    network_mode: host
+    command: "-v -i wlan0 -u http://localhost:8000/predict"
+
   prometheus:
     image: prom/prometheus:latest
     network_mode: host
