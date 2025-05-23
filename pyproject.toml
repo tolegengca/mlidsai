@@ -1,0 +1,14 @@
+[project]
+name = "mlidsai"
+version = "0.1.0"
+description = "mlidsai"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.12",
+    "numpy>=2.2.6",
+    "prometheus-client>=0.22.0",
+    "scapy>=2.6.1",
+    "tensorflow>=2.14.0",
+    "uvicorn>=0.34.2",
+]
