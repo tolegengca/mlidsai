@@ -13,7 +13,7 @@ class Predictor:
 
         for model in self.models.values():
             prediction = model.predict(record)
-            if prediction:
+            if prediction and model.is_anomaly(prediction):
                 predictions.add(prediction)
 
         return predictions
