@@ -17,5 +17,4 @@ class StaticModel(AbstractModel):
         self.label = label
 
     def predict(self, features: dict) -> str:
-        print(f"Got features: {features}, returning {self.label}")
         return self.label

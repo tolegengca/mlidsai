@@ -8,12 +8,15 @@ class Predictor:
         ]
         self.models = {model.name: model for model in models}
 
-    def predict(self, record: dict) -> set:
-        predictions = set()
+    def predict(self, record: dict) -> dict[str, bool]:
+        """
+        Predict anomalies in a given record using the loaded models.
+        Returns a dictionary with prediction label and whether it is an anomaly.
+        """
+        predictions = dict()
 
         for model in self.models.values():
-            prediction = model.predict(record)
-            if prediction and model.is_anomaly(prediction):
-                predictions.add(prediction)
+            if prediction := model.predict(record):
+                predictions[prediction] = model.is_anomaly(prediction)
 
         return predictions

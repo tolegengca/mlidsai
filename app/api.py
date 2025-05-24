@@ -1,3 +1,5 @@
+from pprint import pprint
+
 from fastapi import FastAPI
 
 from app.compact import convert_cicflowmeter_to_cse_cic_ids
@@ -13,6 +15,8 @@ async def get_root():
 
 
 @app.post("/predict")
-async def post_predict(record: dict):
+async def post_predict(record: dict) -> dict[str, bool]:
     record = convert_cicflowmeter_to_cse_cic_ids(record)
-    predictor.predict(record)
+    prediction = predictor.predict(record)
+    pprint(prediction)
+    return prediction
