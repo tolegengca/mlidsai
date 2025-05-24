@@ -7,8 +7,10 @@ requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.12",
     "numpy>=2.2.6",
+    "pandas>=2.2.3",
     "prometheus-client>=0.22.0",
     "scapy>=2.6.1",
+    "streamlit>=1.45.1",
     "tensorflow>=2.14.0",
     "uvicorn>=0.34.2",
 ]
