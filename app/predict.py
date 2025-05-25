@@ -1,10 +1,12 @@
-from app.model import StaticModel
+# from app.model import StaticModel
+from app.model import IsolationForest
 
 
 class Predictor:
     def __init__(self):
         models = [
-            StaticModel("normal"),
+            # StaticModel("normal"),
+            IsolationForest(),
         ]
         self.models = {model.name: model for model in models}
 
@@ -16,7 +18,7 @@ class Predictor:
         predictions = dict()
 
         for model in self.models.values():
-            if prediction := model.predict(record):
+            if prediction := model.predict(model.filter_features(record)):
                 predictions[prediction] = model.is_anomaly(prediction)
 
         return predictions

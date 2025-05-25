@@ -53,3 +53,7 @@ class AbstractModel(metaclass=ABCMeta):
     @classmethod
     def is_anomaly(cls, prediction: str) -> bool:
         return cls.labels.get(prediction, False)
+
+    @classmethod
+    def filter_features(cls, features: Dict[str, float]) -> Dict[str, float]:
+        return {f: features[f] for f in cls.features if f in features}
