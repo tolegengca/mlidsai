@@ -5,13 +5,16 @@ from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 
 from app.compact import convert_cicflowmeter_to_cse_cic_ids
 from app.predict import Predictor
-from app.model.static import StaticModel
 
 app = FastAPI()
 predictor = Predictor()
 
-# List all supported anomaly types (labels with value True)
-ALL_ANOMALY_TYPES = [k for k, v in StaticModel.labels.items() if v]
+ALL_ANOMALY_TYPES = {
+    k
+    for model in predictor.models.values()
+    for k, v in getattr(model, "labels", {}).items()
+    if v
+}
 
 # Prometheus metrics
 total_bytes = Counter("mlidsai_total_bytes_total", "Total bytes processed")
