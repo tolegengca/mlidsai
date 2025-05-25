@@ -1,5 +1,3 @@
-from pprint import pprint
-
 from fastapi import FastAPI, Response
 from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 
@@ -45,7 +43,7 @@ async def get_root():
 async def post_predict(record: dict) -> dict[str, bool]:
     record = convert_cicflowmeter_to_cse_cic_ids(record)
     prediction = predictor.predict(record)
-    pprint(prediction)
+    print("PREDICTION:", prediction)
 
     # Update metrics
     # Estimate bytes and packets from record (if available)
