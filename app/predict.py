@@ -1,5 +1,5 @@
 # from app.model import StaticModel
-from app.model import IsolationForest
+from app.model import IsolationForest, RandomForest
 
 
 class Predictor:
@@ -7,6 +7,7 @@ class Predictor:
         models = [
             # StaticModel("normal"),
             IsolationForest(),
+            RandomForest(),
         ]
         self.models = {model.name: model for model in models}
 

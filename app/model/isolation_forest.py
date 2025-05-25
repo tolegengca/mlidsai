@@ -133,5 +133,5 @@ class IsolationForest(AbstractModel):
         pca = self.pca_transformer.transform(scaled)
 
         # Predict
-        pred = self.model.predict(pca)[0]  # -1: anomaly, 1: normal
-        return "anomaly" if pred == -1 else "normal"
+        pred = self.model.predict(pca)[0]
+        return "anomaly" if pred == 1 else "normal"
