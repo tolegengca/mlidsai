@@ -39,9 +39,7 @@ async def get_root():
     return {"message": "POST /predict"}
 
 
-@app.post("/predict")
-async def post_predict(record: dict) -> dict[str, bool]:
-    record = convert_cicflowmeter_to_cse_cic_ids(record)
+def predict(record: dict) -> dict[str, bool]:
     prediction = predictor.predict(record)
     print("PREDICTION:", prediction)
 
@@ -71,3 +69,14 @@ async def post_predict(record: dict) -> dict[str, bool]:
             anomaly_type_packets.labels(type=anomaly_type)
 
     return prediction
+
+
+@app.post("/predict")
+async def post_predict(record: dict) -> dict[str, bool]:
+    record = convert_cicflowmeter_to_cse_cic_ids(record)
+    return predict(record)
+
+
+@app.post("/predict_cse_cic_ids")
+async def post_predict_cse_cic_ids(record: dict) -> dict[str, bool]:
+    return predict(record)
