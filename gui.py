@@ -10,6 +10,10 @@ st.title("Session Anomaly Detection")
 
 data_file = st.file_uploader("Upload session CSV", type=["csv"])
 
+format_option = st.selectbox(
+    "Select input format", ["CICFlowMeter", "CSE-CIC-IDS"], index=0
+)
+
 model_names = predictor.models.keys()
 selected_models = st.multiselect(
     "Select models to apply", model_names, default=model_names
@@ -23,7 +27,8 @@ mandatory_fields = [
 
 if data_file is not None and selected_models:
     df = pd.read_csv(data_file)
-    df = df.apply(convert_cicflowmeter_to_cse_cic_ids, axis=1, result_type="expand")
+    if format_option == "CICFlowMeter":
+        df = df.apply(convert_cicflowmeter_to_cse_cic_ids, axis=1, result_type="expand")
 
     display_fields = [f for f in mandatory_fields if f in df.columns]
     results = []
