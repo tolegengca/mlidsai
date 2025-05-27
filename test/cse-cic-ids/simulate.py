@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 
 API_URL = "http://localhost:8000/predict_cse_cic_ids"
-CSV_PATH = Path(__file__).parent / "csv_1k.csv"
+CSV_PATH = Path(__file__).parent / "10k.csv"
 
 # Read CSV and get labels
 print("Loading data...")
