@@ -34,7 +34,12 @@ if data_file is not None and selected_models:
     results = []
     for idx, row in df.iterrows():
         record = row.to_dict()
-        predictions = predictor.predict(record)
+        predictions = {}
+        for model in predictor.models.values():
+            if model.name in selected_models:
+                prediction = model.predict(record)
+                predictions.update({prediction: model.is_anomaly(prediction)})
+
         is_anomaly = any(predictions.values())
         results.append(
             {
