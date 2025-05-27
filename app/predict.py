@@ -1,13 +1,10 @@
-# from app.model import StaticModel
-from app.model import IsolationForest, RandomForest
+from app.model import XDGBoost
 
 
 class Predictor:
     def __init__(self):
         models = [
-            # StaticModel("normal"),
-            IsolationForest(),
-            RandomForest(),
+            XDGBoost(),
         ]
         self.models = {model.name: model for model in models}
 

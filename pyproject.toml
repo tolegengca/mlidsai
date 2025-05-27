@@ -15,4 +15,5 @@ dependencies = [
     "streamlit>=1.45.1",
     "tensorflow>=2.14.0",
     "uvicorn>=0.34.2",
+    "xgboost>=3.0.2",
 ]
