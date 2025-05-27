@@ -1,12 +1,13 @@
 services:
   app:
-    build: .
+    # build: .
+    image: ghcr.io/tolegengca/mlidsai:latest
     network_mode: host
 
   cicflowmeter:
     image: ghcr.io/tshelter/cicflowmeter:latest
     network_mode: host
-    command: "-v -i wlan0 -u http://localhost:8000/predict"
+    command: "-v -i wlp1s0 -u http://localhost:8000/predict"
 
   prometheus:
     image: prom/prometheus:latest
