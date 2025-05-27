@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import ClassVar, Dict, List, Set
+from typing import ClassVar
 from app.compact import CSE_CIC_IDS_FEATURES
 
 
@@ -15,10 +15,10 @@ class AbstractModel(metaclass=ABCMeta):
     Tracks all subclasses and validates model configuration.
     """
 
-    _registry: ClassVar[Set[str]] = set()
+    _registry: ClassVar[set[str]] = set()
     name: ClassVar[str]
-    features: ClassVar[List[str]]
-    labels: ClassVar[Dict[str, bool]]
+    features: ClassVar[list[str]]
+    labels: ClassVar[dict[str, bool]]
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -43,11 +43,11 @@ class AbstractModel(metaclass=ABCMeta):
                 )
 
     @abstractmethod
-    def predict(self, features: Dict[str, float]) -> str:
+    def predict(self, features: dict) -> str:
         pass
 
     @classmethod
-    def features_to_list(cls, features: Dict[str, float]) -> List[float]:
+    def features_to_list(cls, features: dict) -> list[float]:
         return [features[f] for f in cls.features]
 
     @classmethod
@@ -55,5 +55,5 @@ class AbstractModel(metaclass=ABCMeta):
         return cls.labels.get(prediction, False)
 
     @classmethod
-    def filter_features(cls, features: Dict[str, float]) -> Dict[str, float]:
+    def filter_features(cls, features: dict) -> dict:
         return {f: features[f] for f in cls.features if f in features}
