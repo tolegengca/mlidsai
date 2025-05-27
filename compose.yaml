@@ -1,6 +1,7 @@
 services:
   app:
     build: .
+    # image: ghcr.io/tolegengca/mlidsai:latest
     network_mode: host
 
   cicflowmeter:

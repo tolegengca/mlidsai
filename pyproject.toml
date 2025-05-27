@@ -6,14 +6,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.12",
-    "joblib>=1.5.1",
     "numpy>=2.2.6",
     "pandas>=2.2.3",
     "prometheus-client>=0.22.0",
-    "scapy>=2.6.1",
     "scikit-learn>=1.6.1",
     "streamlit>=1.45.1",
-    "tensorflow>=2.14.0",
     "uvicorn>=0.34.2",
     "xgboost>=3.0.2",
 ]
